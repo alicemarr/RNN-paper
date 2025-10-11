@@ -6,6 +6,4 @@ Here is the file to reproduce the results of our analysis of three Vanilla RNNs 
 SSM reduction was performed, given simulated test and train trajectories, through the Matlab package SSMLearn (https://github.com/haller-group/SSMLearn); results were saved in the "Data" subfolder of each experiment.
 Helper functions for constructing the SSM parametrization and reduced dynamics in Python can be found in the helper file "SSMfunctions.py".
 
-# For codeocean:
-Figures are saved in the result folder at each run. 
 
