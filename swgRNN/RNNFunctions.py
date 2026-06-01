@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 
 network_type = 'swg' 
 dim_type = 'columns' 
-base_dir_data = '.\swgRNN'
+base_dir_data = './swgRNN'
 
 from swgRNN.utils.UtilsIO import UtilsIO
 from swgRNN.utils.UtilsOpDims import UtilsOpDims
@@ -12,7 +12,7 @@ from swgRNN.utils.UtilsOpDims import UtilsOpDims
 UIO  = UtilsIO()
 UOD = UtilsOpDims()
 net_id = 1
-path_to_weights = os.path.join(base_dir_data, 'pretrained_networks', network_type, network_type+'_weights.h5')
+path_to_weights = os.path.join(base_dir_data,'pretrained_networks', network_type, network_type+'_weights.h5')
 W = UIO.load_weights(path_to_weights, net_id)[1]
 
 Y = UIO.load_weights(path_to_weights, net_id)[2]
@@ -36,7 +36,7 @@ def J(fpt, tau = 0.01):
 def f0(x,fp, tau = 0.01):
     return (np.matmul(W, np.tanh(x))- np.matmul(np.multiply(W,1/(np.cosh(fp)**2)), x))/tau
 
-from SSMfunctions import construct_SSM
+from rnn_paper.SSMfunctions import construct_SSM
 def ROMt(t,u, coeffs, exps, ss, f1, fp, tau = 0.01, dt = 1e-3):
     
     x = construct_SSM(u, coeffs[:,:], exps)

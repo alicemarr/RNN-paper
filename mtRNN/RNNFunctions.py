@@ -3,7 +3,7 @@
 import numpy as np
 
 # Load RNN params
-object_file = np.load('../DataMt/model_params.npz')
+object_file = np.load('mtRNN/model_params.npz')
 W= object_file['w_in'].T
 N = W.shape[0]
 Win = W[:,:20]
