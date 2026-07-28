@@ -225,23 +225,65 @@ def plotParamSSM(m,tangent_space,eta1_vec,all_coeffsP, fixed_pointsP,ps, p_fpt0,
         ki = ki+1
     return h11'''
 
-def calculate_H11_vectorized(N, d, evals_sorted, P, P_inv, d2fy2, anchor, ui, nTimesteps, div=1, dt=0.001, tau=0.01):
-    # Step 1: Compute m11 (shape: (N-d, nTimesteps))
-    tmp = np.dot(d2fy2, anchor)                # Shape: (M, M)
-    tmp2 = np.matmul(P, ui)                    # Shape: (M, nTimesteps)
-    m11 = np.matmul(P_inv, np.tensordot(tmp, tmp2, axes=(1, 0)))  # Shape: (N, nTimesteps)
-    m11 = m11[d:]  # Shape: (N-d, nTimesteps)
-
-    # Step 2: Compute diagonal matrices A(t) using broadcasting
-    time = np.arange(0, nTimesteps * dt, dt / div)  # Shape: (T,)
-    At = np.exp(np.outer(time, evals_sorted[d:]))   # Shape: (T, N-d)
-
-    h = np.einsum('tn,nt->tn', At, m11) * dt / tau
-
-    return h
 
 
 def calculate_A1(d, evals, eig):
     Ak = np.copy(evals[d:])
     Ak = Ak-eig
     return Ak
+
+def calculate_H11_vectorized(N, d, evals_sorted, P, P_inv, d2fy2, anchor, ui,
+                             nTimesteps, div=1, dt=0.001, tau=0.01,
+                             order=2, h0='quasistatic'):
+    """h11(t) solving  dh/dt = (Lambda[d:] - lambda_1) h + m11(t),
+    integrated by exponential time differencing. Returns (T, N-d), complex,
+    i.e. the same convention as before -> caller still does `.T`.
+    `tau` is unused (it sits inside evals_sorted); kept for signature compatibility."""
+    if d != 1:
+        raise NotImplementedError('written for a 1-D master subspace')
+    step = dt / div                      # the *actual* grid step, not dt
+    T = anchor.shape[1]
+
+    # m11(t), contracting d2fy2 with the eigenvector first to avoid an (N,N,T) array
+    m11 = np.einsum('ijk,j,kt->it', d2fy2, np.matmul(P, ui), anchor, optimize=True)
+    m11 = np.matmul(P_inv, m11)[d:]                       # (N-d, T)
+
+    A1 = evals_sorted[d:] - evals_sorted[0]               # = np.diag(A10)
+    if np.any(np.real(A1) >= 0):
+        raise ValueError('no spectral gap: Re(lambda_n - lambda_1) >= 0')
+
+    # ETD coefficients (A1 diagonal -> everything elementwise)
+    z    = A1 * step
+    E    = np.exp(z)
+    small = np.abs(z) < 1e-6                              # series guard
+    zs   = np.where(small, 1.0, z)
+    phi1 = np.where(small, 1 + z/2 + z**2/6,   (E - 1) / zs)
+    phi2 = np.where(small, 0.5 + z/6 + z**2/24, (E - 1 - z) / zs**2)
+
+    h = np.zeros((T, N - d), dtype=complex)
+    h[0] = -m11[:, 0] / A1 if h0 == 'quasistatic' else 0.0   # slaved value; 'zero' also fine
+    b1, b2 = step * phi1, step * phi2
+    if order == 1:                                        # m11 piecewise constant
+        for k in range(T - 1):
+            h[k+1] = E * h[k] + b1 * m11[:, k]
+    else:                                                 # m11 piecewise linear
+        for k in range(T - 1):
+            h[k+1] = E * h[k] + b1 * m11[:, k] + b2 * (m11[:, k+1] - m11[:, k])
+    return h
+
+
+def construct_SSM1Dt(uv, t, epsilon, *args, surf =True):
+    # h0i = 0, h10 = 0, h20, h11, 
+    coeff11, coeff20, coeff30 = args
+ 
+    if surf:
+        u = np.tile(np.expand_dims(uv, 0), (len(t),1))
+        return np.concatenate(([u],np.multiply(np.tile(np.expand_dims(coeff20, (1,2)),(1,np.shape(u)[0], np.shape(u)[1])),u**2)+ np.multiply(np.tile(np.expand_dims(coeff30, (1,2)),(1,np.shape(u)[0], np.shape(u)[1])),u**3)
+                            + epsilon*np.multiply(np.tile(np.expand_dims(coeff11[:,t],2),(1,1,np.shape(u)[1])),u)), axis =0)
+    else:
+        u = uv
+        return np.concatenate(([u],np.multiply(np.tile(np.expand_dims(coeff20, (1)),(1,np.shape(u)[0])),u**2)+ 
+                            + np.multiply(coeff11[:,t],u)*epsilon), axis =0)
+
+
+

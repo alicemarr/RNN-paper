@@ -11,7 +11,7 @@ B = np.load('./cddmRNN/B.npy')
 dt = 0.001
 #t_ev = np.arange(0,2, dt)
 
-def RHS(t,y, f1, fp = np.zeros(N),mat = np.identity(N), mat_inv = np.identity(N),tau = 0.01):
+def RHS(t,y, f1, fp = np.zeros(N),mat = np.identity(N), mat_inv = np.identity(N),tau = 0.01, dt = 0.001):
     i = int(t/dt)
     return (-y -np.matmul(mat,fp)+ np.dot(np.matmul(mat,W), np.tanh(np.matmul(mat_inv,y)+ fp)) +np.matmul(mat,f1[:,i]))/tau
 
